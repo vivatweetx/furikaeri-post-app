@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ふりかえり投稿管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ▼▼▼ ここにFirebaseの設定を貼り付けてください ▼▼▼ -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // ===== 🔥 Firebase設定（ここを書き換えてください） =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyAp6pSioFORPjRHxoF57B1QsSIwvKXHUSk",
+      authDomain: "furikaeri-post-app.firebaseapp.com",
+      projectId: "furikaeri-post-app",
+      storageBucket: "furikaeri-post-app.firebasestorage.app",
+      messagingSenderId: "452191460927",
+      appId: "1:452191460927:web:ee96fe6e45fc91e7b7a28a"
+    };
+    // ===== 🔥 設定ここまで =====
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const DOC_ID = "furikaeri_data"; // Firestoreのドキュメント名（変更不要）
+
+    // Firebaseの読み書き関数をグローバルに公開
+    window.fbLoad = async () => {
+      try {
+        const ref = doc(db, "posts", DOC_ID);
+        const snap = await getDoc(ref);
+        return snap.exists() ? snap.data() : null;
+      } catch(e) {
+        console.error("Firebase読み込みエラー:", e);
+        return null;
+      }
+    };
+
+    window.fbSave = async (data) => {
+      try {
+        const ref = doc(db, "posts", DOC_ID);
+        await setDoc(ref, data);
+        return true;
+      } catch(e) {
+        console.error("Firebase保存エラー:", e);
+        return false;
+      }
+    };
+
+    // アプリ初期化イベントを発火
+    window.dispatchEvent(new Event("firebase-ready"));
+  </script>
+  <!-- ▲▲▲ Firebase設定ここまで ▲▲▲ -->
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Helvetica Neue', sans-serif; background: #fafaf9; }
+    pre { font-family: inherit; }
+    .fade-in { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // ===== 記事初期データ =====
+    const INITIAL_ARTICLES = [
+      { id: 1, type: "TIPS", title: "ふりかえりはルーチンに「組み込む」もの",
+        short: "ふりかえりを「意志の力」で続けようとすると、まず続きません。朝起きたら顔を洗うように、毎日同じ時間・同じ場所でやるのがコツです。通勤電車の5分でも、就業前の15分でもいい。「固定のタイミング」にぶち込んでしまいましょう。\n\nやってみよう：あなたの毎日のルーティンの中で、ふりかえりを差し込めるタイミングはどこですか？",
+        x: "ふりかえりを「意志の力」で続けようとすると、まず続きません。朝起きたら顔を洗うように、毎日同じ時間・同じ場所でやるのがコツ。通勤電車の5分でもOK。「いつやるか」を先に決めてしまいましょう #ふりかえり",
+        sizu: "**ふりかえりはルーチンに「組み込む」もの**\n\nふりかえりを「意志の力」で続けようとすると、まず続きません。\n\n私自身、毎日通勤電車の中で頭の中でふりかえりをしています。場所も時間も固定。これが一番シンプルで効果的なやり方でした。\n\n朝起きたら顔を洗う。ご飯を食べたら歯を磨く。そういう「考えずにやっているルーティン」の中に、ふりかえりを差し込んでしまうんです。\n\n具体的にはこんなイメージです。\n・毎朝始業後の15分で昨日のふりかえり\n・退勤前の15分でその日をふりかえる\n・通勤電車の5分で頭の中でサッとふりかえる\n・毎週金曜16時から30分、自分のためのふりかえり\n\nどれが合うかは人によって違います。大事なのは「固定のタイミング」をつくること。\n\nやってみよう：あなたの毎日のルーティンの中で、ふりかえりを差し込めるタイミングはどこですか？" },
+      { id: 2, type: "手法", title: "YWT（やったこと・わかったこと・つぎやること）",
+        short: "YWTはY「やったこと」、W「わかったこと」、T「つぎやること」の頭文字をとった手法です。経験学習サイクルを回すのにとにかく軽くて使いやすい。KPTで「Problemばかりでしんどい」という経験がある人にこそ試してほしいです。ひとりでも、チームでも使えて、1日分なら5〜15分が目安。\n\nやってみよう：今日1日をYWTでふりかえるとしたら、「わかったこと」に何が書けそうですか？",
+        x: "KPTで「Problemばかり出てしんどい」ってなった経験ありませんか？そんな人にはYWT（やったこと・わかったこと・つぎやること）がおすすめ。学びにフォーカスできて、ふりかえりが前向きになります #ふりかえり",
+        sizu: "**YWT：学びにフォーカスしたふりかえりの手法**\n\nKPTを使ってみたけど、「Problemばかり出てきてしんどくなった」という経験はありませんか？\n\n私もよく相談を受けます。そういう人に真っ先に紹介するのがYWTです。\n\nYWTは、Y「やったこと」、W「わかったこと」、T「つぎやること」のローマ字の頭文字をとっています。\n\nKPTとYWTの大きな違いは「問いの向き」です。KPTだとProblemが溢れて、ふりかえりが「反省会」になりがちです。\n\nYWTは「やったこと」から入るので、まず自分の行動を肯定的に思い出せる。そして「わかったこと」という広い問いが、学びや気付きを自然に引き出してくれます。\n\nやってみよう：今日1日をYWTでふりかえるとしたら、「わかったこと」に何が書けそうですか？" },
+      { id: 3, type: "TIPS", title: "アクションが実行されないのは「意志が弱い」せいじゃない",
+        short: "ふりかえりでアクションを決めたのに、やらないまま次のふりかえりになる——よくある話です。原因のほとんどは「目に入らなくなること」。PCのモニタの端、手帳の表紙、毎日通る壁に貼っておくだけで変わります。強制力じゃなく、自然に動ける仕掛けをつくりましょう。\n\nやってみよう：直近のふりかえりで決めたアクション、今どこにありますか？",
+        x: "ふりかえりでアクションを決めたのに実行されない、それ意志の問題じゃないです。「目に入らなくなる」だけ。PCのモニタや手帳の表紙など、毎日目に入る場所に貼っておく。それだけで変わります #ふりかえり",
+        sizu: "**アクションが実行されないのは、意志が弱いせいじゃない**\n\n「ふりかえりでアクションを決めたのに、気づいたら次のふりかえりになってた」——この悩み、本当によく聞きます。\n\nそのとき多くの人が「自分の意志が弱い」と思ってしまう。でも、そうじゃないんです。\n\n原因はほとんどの場合「アクションが目に入らなくなること」です。\n\n解決策はシンプルで、「意識せずとも目に入る場所」に置くこと。PCのモニタの端に付箋を貼る。手帳の表紙に書く。毎朝通るデスクの壁に貼り出す。\n\n「やらなければ」という強制力じゃなく、自然に動ける仕掛けをつくる。この発想の転換が大事です。\n\nやってみよう：直近のふりかえりで決めたアクション、今どこにありますか？毎日目に入る場所に置けていますか？" },
+      { id: 4, type: "手法", title: "Good & New（グッドアンドニュー）",
+        short: "「よかったこと」と「新しい気付き」の2つをシンプルに共有する手法です。アイスブレイクにも場作りにも使えます。どんなに小さなことでもいい。前向きな気持ちで始まったふりかえりは、アイデアが出やすく、相手の話もちゃんと聴けるようになるんです。一人×1分程度でサクッとできます。\n\nやってみよう：今日1つだけ「よかったこと」か「新しい気付き」を思い浮かべてみてください。",
+        x: "ふりかえりの前に「よかったこと」「新しい気付き」を一言ずつ共有するだけで、場の雰囲気がガラッと変わります。それがGood & New。「庭のチューリップの芽が出た」でも全然OK。小さいことでいい。 #ふりかえり",
+        sizu: "**Good & New：ふりかえりの場を前向きに温める手法**\n\nふりかえりを始めようとしたとき、チームの空気が重かったり、みんなの表情が固かったりすること、ありませんか？\n\nそんなときに使えるのがGood & Newです。\n\n「よかったこと（Good）」と「新しい気付き（New）」の2つを、一人ひとつだけ共有する。それだけです。\n\n小さければ小さいほど、みんなの発言のハードルが下がって、次の人も話しやすくなります。\n\nこの手法のいいところは、前向きな気持ちに切り替えてくれること。ポジティブな状態でふりかえりに入ると、アイデアが出やすくなったり、相手の話をちゃんと聴けるようになったりするんです。\n\nやってみよう：今日1つだけ「よかったこと」か「新しい気付き」を思い浮かべてみてください。何が出てきましたか？" },
+      { id: 5, type: "TIPS", title: "感情は「ノイズ」じゃなくて、学びへの入口",
+        short: "「楽しかった」「なんかモヤっとした」——その感情、スルーしていませんか？感情を1段階だけ掘り下げると、自分が大切にしていることや、気づいていなかった価値観が出てきます。「なぜそう感じたのか」を問うだけで、ふりかえりの深さがぐっと変わります。\n\nやってみよう：今日1番印象に残った感情は何ですか？「なぜそう感じたのか」を少しだけ掘り下げてみてください。",
+        x: "「楽しかった」「モヤっとした」という感情、ふりかえりでスルーしてませんか？その感情を1段階だけ掘り下げると、自分が大切にしていることが見えてきます。感情はノイズじゃなくて、学びへの入口です #ふりかえり",
+        sizu: "**感情は「ノイズ」じゃなくて、学びへの入口**\n\nふりかえりをしているとき、「楽しかった」「なんかモヤっとした」「ちょっと嬉しかった」という感情が出てくることがあります。それ、スルーしていませんか？\n\n「感情は主観だから」と思って、事実だけをふりかえっている人がいます。でも実は、感情こそが学びへの入口なんです。\n\n感情を1段階だけ掘り下げると、そこに大切なものが隠れています。\n\n「なぜ楽しかったのか？」→「新しいことを試せたから」→「私は挑戦することが好きなんだ」\n「なぜモヤっとしたのか？」→「自分の意見が通らなかったから」→「意見を尊重されることを大切にしているんだ」\n\nやってみよう：今日1番印象に残った感情は何ですか？「なぜそう感じたのか」を少しだけ掘り下げてみてください。" },
+      { id: 6, type: "手法", title: "+/Δ（プラス/デルタ）",
+        short: "ふりかえりそのものをふりかえる手法です。「今日のふりかえり、よかったところ（＋）」と「改善したいところ（Δ）」を5分だけ話し合います。これを繰り返すと、ふりかえりが少しずつよくなっていきます。ふりかえりのカイゼンも、ふりかえりでやればいい。\n\nやってみよう：直近のふりかえり、よかったところと「次はこうしたい」と思ったところはそれぞれ何ですか？",
+        x: "ふりかえりをよくするにはどうすればいい？→ふりかえりのふりかえりをすればいい。それが+/Δ（プラス/デルタ）。「よかったところ」と「改善したいところ」を5分話すだけ。シンプルだけど効く #ふりかえり",
+        sizu: "**+/Δ：ふりかえりをカイゼンするための、ふりかえり**\n\n「ふりかえりをよくするにはどうすればいいですか？」という質問をよく受けます。\n\n答えはシンプルで、ふりかえりそのものをふりかえればいいんです。それが+/Δ（プラス/デルタ）という手法です。\n\n「今日のふりかえり、よかったところ（＋）」と「改善したいところ（Δ）」を、5分だけ話し合います。ホワイトボードを二分割して、意見のある人からどんどん言っていくだけ。\n\nこの手法のポイントは「テンポよく続けること」です。毎回やる必要はありません。4〜8回に1回くらい+/Δの時間をとるだけでいい。\n\nやってみよう：直近のふりかえり、よかったところと「次はこうしたい」と思ったところはそれぞれ何ですか？" },
+      { id: 7, type: "TIPS", title: "「毎日同じレベルで書ききろう」としなくていい",
+        short: "毎日ふりかえりを続けていると、「今日は全然書けなかった」という日が出てきます。それ、全然OKです。大事なのはレベルを保つことじゃなくて、続けること。適当に書く日があっても、ちょっとだけの日があっても、それで十分。\n\nやってみよう：続けられている今日の自分を、ちゃんと認めてあげてください。",
+        x: "「今日は全然書けなかった」という日があっても、全然OK。大事なのはレベルを保つことじゃなくて、続けること。ちょっとだけの日があっていい。「全部やりきらなければ」という呪縛、そろそろ手放しましょう #ふりかえり",
+        sizu: "**「毎日同じレベルで書ききろう」としなくていい**\n\n毎日ふりかえりを続けていると、必ず「今日は全然書けなかった」「なんか適当になってしまった」という日が出てきます。\n\nそれ、全然OKです。\n\n大事なのは、毎回完璧に書くことじゃなくて、続けること。\n\nちょっとだけ書いてもいい。箇条書き1行でもいい。「今日は疲れた」の1文でもいい。ゼロよりずっといいんです。\n\n無理しないことが、長く続ける一番のコツだと思っています。適当な日を責めるのではなく、「今日も続けた」という事実を、ちゃんと認めてあげてください。\n\nやってみよう：最近のふりかえりで「適当になった」と感じた日はありましたか？それでも続けられている自分を、ちゃんと認めてあげてください。" },
+    ];
+
+    const ARTICLE_TEMPLATES = [
+      { type: "TIPS", topics: ["ふりかえりの問いを深める方法", "チームのふりかえりをもっと楽しくする工夫", "1週間ふりかえりのやり方", "ふりかえりで自己承認する大切さ", "ふりかえりを公表することの効果", "ふりかえりの記録を振り返る習慣", "感謝をふりかえりに取り入れる方法"] },
+      { type: "手法", topics: ["KPT（Keep・Problem・Try）", "Fun/Done/Learn", "学習マトリックス", "Celebration Grid", "Timeline（タイムライン）", "ORID", "4Ls（Liked/Lacked/Learned/Longed for）"] },
+    ];
+
+    const TAB_LABELS = ["📝 紹介文", "𝕏 X投稿", "📖 sizu"];
+    const TAB_KEYS = ["short", "x", "sizu"];
+
+    function getTodayDayIndex(startDate) {
+      if (!startDate) return null;
+      const start = new Date(startDate);
+      const today = new Date();
+      start.setHours(0,0,0,0); today.setHours(0,0,0,0);
+      return Math.floor((today - start) / 86400000);
+    }
+
+    function dateFromDayIndex(startDate, dayIndex) {
+      if (!startDate) return null;
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + dayIndex);
+      return d.toISOString().split("T")[0];
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand("copy");
+        document.body.removeChild(ta);
+      });
+    }
+
+    // ===== ArticleCard =====
+    function ArticleCard({ article, dayIndex, isToday, startDate, releaseStatus, onToggleRelease, onEdit, onRegenerate }) {
+      const [activeTab, setActiveTab] = React.useState(0);
+      const [copied, setCopied] = React.useState(false);
+      const tabKey = TAB_KEYS[activeTab];
+      const isTabReleased = releaseStatus?.[tabKey];
+      const allReleased = TAB_KEYS.every(k => releaseStatus?.[k]);
+      const releaseDate = startDate ? dateFromDayIndex(startDate, dayIndex) : null;
+
+      const handleCopy = () => {
+        copyToClipboard(article[tabKey]);
+        setCopied(true); setTimeout(() => setCopied(false), 2000);
+      };
+
+      return (
+        <div className={`rounded-xl border-2 overflow-hidden fade-in ${isToday ? "bg-amber-50 border-amber-300" : allReleased ? "bg-stone-50 border-stone-200 opacity-80" : "bg-white border-stone-200"}`}>
+          <div className="px-5 pt-4 pb-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-xs font-bold text-stone-400">Day {dayIndex + 1}</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${article.type === "TIPS" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>{article.type}</span>
+                  {isToday && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-800">今日</span>}
+                  {releaseDate && <span className="text-xs text-stone-400">{releaseDate}</span>}
+                  {allReleased && <span className="text-xs text-stone-400">全媒体完了 ✓</span>}
+                </div>
+                <p className="text-sm font-bold text-stone-800 leading-snug">{article.title}</p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button onClick={() => onRegenerate(article)} className="text-xs text-stone-400 hover:text-red-500 border border-stone-200 hover:border-red-300 rounded px-2 py-1 transition-colors">再生成</button>
+                <button onClick={() => onEdit(article)} className="text-xs text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 rounded px-2 py-1 transition-colors">編集</button>
+              </div>
+            </div>
+          </div>
+          <div className="flex border-b border-stone-200 px-4 gap-1">
+            {TAB_LABELS.map((label, i) => (
+              <button key={i} onClick={() => setActiveTab(i)}
+                className={`text-xs py-2 px-3 border-b-2 transition-colors flex items-center gap-1 ${activeTab === i ? "border-amber-500 text-amber-700 font-bold" : "border-transparent text-stone-400 hover:text-stone-600"}`}>
+                {label}{releaseStatus?.[TAB_KEYS[i]] && <span className="text-emerald-500">✓</span>}
+              </button>
+            ))}
+          </div>
+          <div className="px-5 py-4">
+            <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{article[tabKey]}</pre>
+            <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+              <span className="text-xs text-stone-400">{(article[tabKey] || "").replace(/\s/g,"").length}文字</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onToggleRelease(dayIndex, tabKey)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${isTabReleased ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
+                  {isTabReleased ? "✓ リリース済み" : "リリース済みにする"}
+                </button>
+                <button onClick={handleCopy} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full transition-colors">
+                  {copied ? "コピーしました ✓" : "コピー"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== Calendar =====
+    function CalendarView({ startDate, articles, releaseStatus, onSelectDay }) {
+      const today = new Date();
+      const [calYear, setCalYear] = React.useState(today.getFullYear());
+      const [calMonth, setCalMonth] = React.useState(today.getMonth());
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      const firstDow = new Date(calYear, calMonth, 1).getDay();
+      const todayStr = today.toISOString().split("T")[0];
+
+      function getDayIndex(dateStr) {
+        if (!startDate) return null;
+        const start = new Date(startDate), d = new Date(dateStr);
+        start.setHours(0,0,0,0); d.setHours(0,0,0,0);
+        const diff = Math.floor((d - start) / 86400000);
+        return diff >= 0 && diff < articles.length ? diff : null;
+      }
+
+      function getReleaseLevel(dayIndex) {
+        if (dayIndex === null) return 0;
+        const rs = releaseStatus[dayIndex];
+        if (!rs) return 0;
+        return TAB_KEYS.filter(k => rs[k]).length;
+      }
+
+      const cells = [];
+      for (let i = 0; i < firstDow; i++) cells.push(null);
+      for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+      return (
+        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100">
+            <button onClick={() => { if(calMonth===0){setCalMonth(11);setCalYear(y=>y-1);}else setCalMonth(m=>m-1); }} className="text-stone-400 hover:text-stone-700 px-2 py-1 rounded text-lg">‹</button>
+            <span className="text-sm font-bold text-stone-700">{calYear}年 {calMonth+1}月</span>
+            <button onClick={() => { if(calMonth===11){setCalMonth(0);setCalYear(y=>y+1);}else setCalMonth(m=>m+1); }} className="text-stone-400 hover:text-stone-700 px-2 py-1 rounded text-lg">›</button>
+          </div>
+          <div className="grid grid-cols-7 text-center">
+            {["日","月","火","水","木","金","土"].map((d,i) => (
+              <div key={i} className={`text-xs py-2 font-bold ${i===0?"text-red-400":i===6?"text-blue-400":"text-stone-400"}`}>{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {cells.map((day, i) => {
+              if (!day) return <div key={i} />;
+              const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+              const dayIndex = getDayIndex(dateStr);
+              const level = getReleaseLevel(dayIndex);
+              const isToday = dateStr === todayStr;
+              const hasArticle = dayIndex !== null;
+              const bg = level===3?"bg-emerald-500 text-white":level===2?"bg-emerald-200 text-emerald-900":level===1?"bg-amber-200 text-amber-900":hasArticle?"bg-stone-100 hover:bg-stone-200":"";
+              return (
+                <div key={i} className="p-1 flex justify-center items-center">
+                  <button onClick={() => hasArticle && onSelectDay(dayIndex)} disabled={!hasArticle}
+                    className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${bg} ${isToday?"ring-2 ring-amber-500 ring-offset-1":""} ${!hasArticle?"text-stone-300":""}`}>
+                    {day}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-3 px-5 py-3 border-t border-stone-100 flex-wrap">
+            {[{color:"bg-stone-200",label:"記事あり"},{color:"bg-amber-200",label:"1媒体"},{color:"bg-emerald-200",label:"2媒体"},{color:"bg-emerald-500",label:"全媒体完了"}].map(({color,label}) => (
+              <div key={label} className="flex items-center gap-1"><span className={`w-3 h-3 rounded-full ${color}`}/><span className="text-xs text-stone-500">{label}</span></div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ===== EditModal =====
+    function EditModal({ article, onSave, onClose }) {
+      const [draft, setDraft] = React.useState({...article});
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+              <h3 className="font-bold text-stone-800">Day {article.id}｜記事を編集</h3>
+              <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
+            </div>
+            <div className="px-6 py-5 space-y-5">
+              {[{key:"title",label:"タイトル",rows:1},{key:"short",label:"📝 紹介文（300文字以内）",rows:6},{key:"x",label:"𝕏 X投稿（140文字以内）",rows:4},{key:"sizu",label:"📖 sizu（600文字以内）",rows:12}].map(({key,label,rows}) => (
+                <div key={key}>
+                  <label className="block text-xs font-bold text-stone-500 mb-1">{label}</label>
+                  <textarea rows={rows} value={draft[key]} onChange={e => setDraft({...draft,[key]:e.target.value})}
+                    className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm text-stone-800 resize-vertical focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                  <p className="text-xs text-stone-400 mt-0.5 text-right">{(draft[key]||"").replace(/\s/g,"").length}文字</p>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex justify-end gap-3">
+              <button onClick={onClose} className="text-sm text-stone-500 hover:text-stone-800 px-4 py-2">キャンセル</button>
+              <button onClick={() => onSave(draft)} className="text-sm bg-amber-500 hover:bg-amber-400 text-white font-bold px-6 py-2 rounded-full">保存する</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== RegenModal =====
+    function RegenModal({ article, onRegenerate, onClose }) {
+      const [loading, setLoading] = React.useState(false);
+      const [result, setResult] = React.useState(null);
+      const [error, setError] = React.useState("");
+      const [customRequest, setCustomRequest] = React.useState("");
+
+      const doGenerate = async () => {
+        setLoading(true); setError(""); setResult(null);
+        try {
+          const prompt = `あなたはふりかえりエバンジェリストの森一樹（@viva_tweet_x）です。
+以下の条件で「Day ${article.id}」の投稿記事を3種類作成してください。
+【記事タイプ】${article.type}
+【現在のタイトル】${article.title}
+${customRequest ? `【追加要望】${customRequest}` : ""}
+【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない
+【出力形式】JSONのみで返してください（マークダウンのコードブロック不要）
+{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）やってみよう：の質問で締める","x":"X投稿（140文字以内）#ふりかえりタグ付き、顔文字なし","sizu":"sizu記事（600文字以内）"}`;
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] })
+          });
+          const data = await res.json();
+          const text = data.content?.map(c=>c.text||"").join("") || "";
+          setResult({...article, ...JSON.parse(text.replace(/```json|```/g,"").trim())});
+        } catch(e) { setError("生成に失敗しました。もう一度試してください。"); }
+        setLoading(false);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+              <h3 className="font-bold text-stone-800">Day {article.id}｜記事を作り直す</h3>
+              <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-stone-50 rounded-lg px-4 py-3 text-sm text-stone-600">
+                <p className="font-bold text-stone-700 mb-1">現在の記事</p>
+                <p>{article.title}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-1">追加の要望（任意）</label>
+                <input type="text" value={customRequest} onChange={e=>setCustomRequest(e.target.value)} placeholder="例：もっと初心者向けに、具体例を増やして"
+                  className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
+              {!result && <button onClick={doGenerate} disabled={loading} className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white font-bold py-2.5 rounded-full">{loading?"AIが生成中...":"AIで作り直す"}</button>}
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              {result && (
+                <div className="space-y-4">
+                  <p className="text-xs font-bold text-emerald-600">生成完了！内容を確認してください</p>
+                  {[{key:"title",label:"タイトル",rows:1},{key:"short",label:"📝 紹介文",rows:4},{key:"x",label:"𝕏 X投稿",rows:2},{key:"sizu",label:"📖 sizu",rows:8}].map(({key,label,rows}) => (
+                    <div key={key}>
+                      <label className="block text-xs font-bold text-stone-500 mb-1">{label}</label>
+                      <textarea rows={rows} value={result[key]} onChange={e=>setResult({...result,[key]:e.target.value})}
+                        className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm resize-vertical focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                      <p className="text-xs text-stone-400 mt-0.5 text-right">{(result[key]||"").replace(/\s/g,"").length}文字</p>
+                    </div>
+                  ))}
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={doGenerate} disabled={loading} className="flex-1 border border-stone-300 text-stone-600 hover:bg-stone-50 text-sm py-2 rounded-full">{loading?"生成中...":"もう一度生成"}</button>
+                    <button onClick={() => onRegenerate(result)} className="flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold text-sm py-2 rounded-full">この内容で保存</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex justify-end">
+              <button onClick={onClose} className="text-sm text-stone-500 hover:text-stone-800 px-4 py-2">閉じる</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== GenerateMoreModal =====
+    function GenerateMoreModal({ currentCount, onGenerate, onClose }) {
+      const [count, setCount] = React.useState(7);
+      const [loading, setLoading] = React.useState(false);
+      const [progress, setProgress] = React.useState(0);
+      const [error, setError] = React.useState("");
+
+      const handleGenerate = async () => {
+        setLoading(true); setError(""); setProgress(0);
+        const newArticles = [];
+        try {
+          for (let i = 0; i < count; i++) {
+            const dayNum = currentCount + i + 1;
+            const tmpl = ARTICLE_TEMPLATES[(currentCount + i) % 2];
+            const topicHint = tmpl.topics[Math.floor((currentCount + i) / 2) % tmpl.topics.length];
+            const prompt = `あなたはふりかえりエバンジェリストの森一樹（@viva_tweet_x）です。
+毎日ふりかえりをしている人向けに「Day ${dayNum}」の投稿記事を作成してください。
+【記事タイプ】${tmpl.type}【テーマヒント】${topicHint}
+【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない
+【出力形式】JSONのみ（マークダウンのコードブロック不要）
+{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）やってみよう：で締める","x":"X投稿（140文字以内）#ふりかえりタグ付き","sizu":"sizu記事（600文字以内）"}`;
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+              method:"POST", headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+            });
+            const data = await res.json();
+            const text = data.content?.map(c=>c.text||"").join("") || "";
+            const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
+            newArticles.push({id: dayNum, type: tmpl.type, ...parsed});
+            setProgress(i + 1);
+            await new Promise(r => setTimeout(r, 300));
+          }
+          onGenerate(newArticles);
+        } catch(e) { setError(`生成中にエラーが発生しました（${progress}件完了）`); }
+        setLoading(false);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+              <h3 className="font-bold text-stone-800">記事を追加生成する</h3>
+              <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-stone-600">現在 <span className="font-bold">{currentCount}日分</span> の記事があります。</p>
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-2">追加する日数</label>
+                <div className="flex gap-2">
+                  {[7,14,30].map(n => (
+                    <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2 text-sm font-bold rounded-lg border transition-colors ${count===n?"bg-amber-500 text-white border-amber-500":"bg-white text-stone-600 border-stone-300 hover:border-stone-500"}`}>{n}日分</button>
+                  ))}
+                </div>
+              </div>
+              {loading ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-stone-500"><span>生成中...</span><span>{progress} / {count}</span></div>
+                  <div className="w-full bg-stone-100 rounded-full h-2"><div className="bg-amber-500 h-2 rounded-full transition-all" style={{width:`${(progress/count)*100}%`}}/></div>
+                  <p className="text-xs text-stone-400 text-center">AIが記事を執筆しています。しばらくお待ちください。</p>
+                </div>
+              ) : (
+                <button onClick={handleGenerate} className="w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-2.5 rounded-full">AIで {count}日分 を生成する</button>
+              )}
+              {error && <p className="text-sm text-red-500">{error}</p>}
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex justify-end">
+              <button onClick={onClose} className="text-sm text-stone-500 hover:text-stone-800 px-4 py-2">閉じる</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== DayDetailModal =====
+    function DayDetailModal({ article, dayIndex, startDate, releaseStatus, onToggleRelease, onEdit, onClose }) {
+      const [activeTab, setActiveTab] = React.useState(0);
+      const [copied, setCopied] = React.useState(false);
+      const tabKey = TAB_KEYS[activeTab];
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-stone-400">Day {dayIndex+1} · {dateFromDayIndex(startDate,dayIndex)}</p>
+                <h3 className="font-bold text-stone-800">{article.title}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onEdit(article)} className="text-xs border border-stone-200 text-stone-500 hover:text-stone-800 rounded px-2 py-1">編集</button>
+                <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
+              </div>
+            </div>
+            <div className="flex border-b border-stone-200 px-4 gap-1">
+              {TAB_LABELS.map((label,i) => (
+                <button key={i} onClick={() => setActiveTab(i)} className={`text-xs py-3 px-3 border-b-2 transition-colors flex items-center gap-1 ${activeTab===i?"border-amber-500 text-amber-700 font-bold":"border-transparent text-stone-400 hover:text-stone-600"}`}>
+                  {label}{releaseStatus?.[TAB_KEYS[i]]&&<span className="text-emerald-500">✓</span>}
+                </button>
+              ))}
+            </div>
+            <div className="px-6 py-5">
+              <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{article[tabKey]}</pre>
+              <div className="flex items-center justify-between mt-4">
+                <button onClick={() => onToggleRelease(dayIndex,tabKey)} className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${releaseStatus?.[tabKey]?"bg-emerald-100 text-emerald-700 border-emerald-300":"bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
+                  {releaseStatus?.[tabKey]?"✓ リリース済み":"リリース済みにする"}
+                </button>
+                <button onClick={() => {copyToClipboard(article[tabKey]);setCopied(true);setTimeout(()=>setCopied(false),2000);}} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full">
+                  {copied?"コピーしました ✓":"コピー"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== メインアプリ =====
+    function App() {
+      const [startDate, setStartDate] = useState(null);
+      const [articles, setArticles] = useState(INITIAL_ARTICLES);
+      const [releaseStatus, setReleaseStatus] = useState({});
+      const [view, setView] = useState("today");
+      const [editTarget, setEditTarget] = useState(null);
+      const [regenTarget, setRegenTarget] = useState(null);
+      const [showGenerateMore, setShowGenerateMore] = useState(false);
+      const [calendarSelectDay, setCalendarSelectDay] = useState(null);
+      const [dateInput, setDateInput] = useState("");
+      const [loaded, setLoaded] = useState(false);
+      const [savedNotice, setSavedNotice] = useState(false);
+      const [syncStatus, setSyncStatus] = useState("idle"); // idle | saving | saved | error
+
+      // Firebase経由でロード
+      useEffect(() => {
+        const init = async () => {
+          if (window.fbLoad) {
+            const data = await window.fbLoad();
+            if (data) {
+              if (data.startDate) setStartDate(data.startDate);
+              if (data.articles) setArticles(data.articles);
+              if (data.releaseStatus) setReleaseStatus(data.releaseStatus);
+            }
+          }
+          setLoaded(true);
+        };
+        if (window.fbLoad) { init(); }
+        else { window.addEventListener("firebase-ready", init); }
+        return () => window.removeEventListener("firebase-ready", init);
+      }, []);
+
+      const saveToFirebase = useCallback(async (newArticles, newStartDate, newReleaseStatus) => {
+        setSyncStatus("saving");
+        const payload = {
+          startDate: newStartDate !== undefined ? newStartDate : startDate,
+          articles: newArticles !== undefined ? newArticles : articles,
+          releaseStatus: newReleaseStatus !== undefined ? newReleaseStatus : releaseStatus,
+          updatedAt: new Date().toISOString(),
+        };
+        const ok = await window.fbSave(payload);
+        setSyncStatus(ok ? "saved" : "error");
+        setTimeout(() => setSyncStatus("idle"), 3000);
+      }, [startDate, articles, releaseStatus]);
+
+      const todayIndex = getTodayDayIndex(startDate);
+
+      const handleSetDate = () => {
+        if (!dateInput) return;
+        setStartDate(dateInput);
+        saveToFirebase(undefined, dateInput, undefined);
+      };
+
+      const handleEditSave = (updated) => {
+        const next = articles.map(a => a.id===updated.id ? updated : a);
+        setArticles(next); saveToFirebase(next, undefined, undefined);
+        setEditTarget(null); setCalendarSelectDay(null);
+      };
+
+      const handleRegenSave = (updated) => {
+        const next = articles.map(a => a.id===updated.id ? updated : a);
+        setArticles(next); saveToFirebase(next, undefined, undefined);
+        setRegenTarget(null);
+      };
+
+      const handleToggleRelease = (dayIndex, tabKey) => {
+        const next = { ...releaseStatus, [dayIndex]: { ...(releaseStatus[dayIndex]||{}), [tabKey]: !(releaseStatus[dayIndex]?.[tabKey]) } };
+        setReleaseStatus(next); saveToFirebase(undefined, undefined, next);
+      };
+
+      const handleGenerateMore = (newArticles) => {
+        const next = [...articles, ...newArticles];
+        setArticles(next); saveToFirebase(next, undefined, undefined);
+        setShowGenerateMore(false);
+      };
+
+      const filteredArticles = articles.filter((_,i) => {
+        if (view==="today") return i===todayIndex;
+        if (view==="upcoming") return todayIndex!==null && i>todayIndex;
+        if (view==="released") return todayIndex!==null && i<=todayIndex;
+        return true;
+      });
+
+      const syncBadge = syncStatus==="saving" ? "⟳ 同期中..." : syncStatus==="saved" ? "☁ 保存しました" : syncStatus==="error" ? "⚠ 保存失敗" : null;
+      const syncColor = syncStatus==="error" ? "text-red-500" : "text-emerald-600";
+
+      if (!loaded) return (
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <p style={{color:"#a8a29e",fontSize:"14px"}}>読み込み中...</p>
+        </div>
+      );
+
+      return (
+        <div className="min-h-screen bg-stone-50">
+          <header className="bg-white border-b border-stone-200 sticky top-0 z-40">
+            <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-stone-400 font-bold tracking-wider">@viva_tweet_x</p>
+                <h1 className="text-base font-black text-stone-800 leading-tight">ふりかえり投稿管理</h1>
+              </div>
+              <div className="flex items-center gap-3">
+                {syncBadge && <span className={`text-xs font-bold ${syncColor}`}>{syncBadge}</span>}
+                <button onClick={() => setShowGenerateMore(true)} className="text-xs bg-amber-500 hover:bg-amber-400 text-white font-bold px-3 py-1.5 rounded-full transition-colors">+ 記事を追加</button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+            <div className="bg-white border border-stone-200 rounded-xl px-5 py-4">
+              <p className="text-xs font-bold text-stone-500 mb-2">開始日（Day 1のリリース日）</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input type="date" value={dateInput || startDate || ""} onChange={e=>setDateInput(e.target.value)} className="text-sm border border-stone-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                <button onClick={handleSetDate} className="text-sm bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full transition-colors">設定</button>
+                {startDate && <span className="text-xs text-stone-400">{startDate} 開始 · 今日は Day {todayIndex!==null&&todayIndex>=0?todayIndex+1:"—"} · 全{articles.length}日分</span>}
+              </div>
+            </div>
+
+            {startDate && <CalendarView startDate={startDate} articles={articles} releaseStatus={releaseStatus} onSelectDay={setCalendarSelectDay} />}
+
+            <div className="flex gap-1 bg-stone-100 p-1 rounded-xl">
+              {[{key:"today",label:"今日の記事"},{key:"upcoming",label:"今後の予定"},{key:"released",label:"リリース済み"},{key:"all",label:"すべて"}].map(({key,label}) => (
+                <button key={key} onClick={() => setView(key)} className={`flex-1 text-xs font-bold py-2 px-1 rounded-lg transition-colors ${view===key?"bg-white text-stone-800 shadow-sm":"text-stone-500 hover:text-stone-700"}`}>{label}</button>
+              ))}
+            </div>
+
+            {!startDate && view!=="all" ? (
+              <div className="text-center py-12 text-stone-400 text-sm">開始日を設定すると各タブが有効になります</div>
+            ) : filteredArticles.length===0 ? (
+              <div className="text-center py-12 space-y-3">
+                <p className="text-stone-400 text-sm">{view==="today"&&"今日対応する記事はありません"}{view==="upcoming"&&"今後の記事がありません"}{view==="released"&&"まだリリース済みの記事はありません"}</p>
+                {view==="upcoming" && <button onClick={() => setShowGenerateMore(true)} className="text-sm bg-amber-500 hover:bg-amber-400 text-white font-bold px-5 py-2 rounded-full">AIで記事を追加生成する</button>}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredArticles.map(article => {
+                  const dayIndex = articles.findIndex(a=>a.id===article.id);
+                  return <ArticleCard key={article.id} article={article} dayIndex={dayIndex} isToday={dayIndex===todayIndex} startDate={startDate} releaseStatus={releaseStatus[dayIndex]||{}} onToggleRelease={handleToggleRelease} onEdit={setEditTarget} onRegenerate={setRegenTarget} />;
+                })}
+              </div>
+            )}
+          </main>
+
+          {editTarget && <EditModal article={editTarget} onSave={handleEditSave} onClose={() => setEditTarget(null)} />}
+          {regenTarget && <RegenModal article={regenTarget} onRegenerate={handleRegenSave} onClose={() => setRegenTarget(null)} />}
+          {showGenerateMore && <GenerateMoreModal currentCount={articles.length} onGenerate={handleGenerateMore} onClose={() => setShowGenerateMore(false)} />}
+          {calendarSelectDay!==null && articles[calendarSelectDay] && (
+            <DayDetailModal article={articles[calendarSelectDay]} dayIndex={calendarSelectDay} startDate={startDate} releaseStatus={releaseStatus[calendarSelectDay]||{}} onToggleRelease={handleToggleRelease} onEdit={a=>{setCalendarSelectDay(null);setEditTarget(a);}} onClose={() => setCalendarSelectDay(null)} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
