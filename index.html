@@ -10,7 +10,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // ===== 🔥 Firebase設定 =====
@@ -35,18 +35,30 @@
     const provider = new GoogleAuthProvider();
     const DOC_ID = "furikaeri_data";
 
-    // ログイン
+    // ログイン（リダイレクト方式）
     window.fbSignIn = async () => {
       try {
-        const result = await signInWithPopup(auth, provider);
-        const email = result.user.email;
-        if (!ALLOWED_EMAILS.includes(email)) {
-          await signOut(auth);
-          return { error: `このアカウント（${email}）はアクセス権限がありません。` };
-        }
-        return { user: result.user };
+        await signInWithRedirect(auth, provider);
+        return {};
       } catch(e) {
         return { error: "ログインに失敗しました: " + e.message };
+      }
+    };
+
+    // リダイレクト後の結果処理
+    window.fbHandleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const email = result.user.email;
+          if (!ALLOWED_EMAILS.includes(email)) {
+            await signOut(auth);
+            return { error: `このアカウント（${email}）はアクセス権限がありません。` };
+          }
+        }
+        return {};
+      } catch(e) {
+        return { error: "ログイン処理エラー: " + e.message };
       }
     };
 
@@ -568,9 +580,15 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const [loaded, setLoaded] = useState(false);
       const [syncStatus, setSyncStatus] = useState("idle");
 
-      // 認証状態の監視
+      // 認証状態の監視 & リダイレクト結果処理
       useEffect(() => {
-        const setup = () => {
+        const setup = async () => {
+          // リダイレクト後の結果を処理
+          if (window.fbHandleRedirect) {
+            const r = await window.fbHandleRedirect();
+            if (r.error) setLoginError(r.error);
+          }
+          // 認証状態の監視開始
           window.fbOnAuthChange(({ user }) => {
             setUser(user);
             setAuthLoading(false);
@@ -581,15 +599,11 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
         return () => window.removeEventListener("firebase-ready", setup);
       }, []);
 
-      // ログイン処理
+      // ログイン処理（リダイレクト）
       const handleLogin = async () => {
         setLoginLoading(true);
         setLoginError("");
-        const result = await window.fbSignIn();
-        if (result.error) {
-          setLoginError(result.error);
-          setLoginLoading(false);
-        }
+        await window.fbSignIn(); // リダイレクトするので戻らない
       };
 
       // ログアウト処理
