@@ -151,8 +151,21 @@
       { type: "手法", topics: ["KPT（Keep・Problem・Try）", "Fun/Done/Learn", "学習マトリックス", "Celebration Grid", "Timeline（タイムライン）", "ORID", "4Ls（Liked/Lacked/Learned/Longed for）"] },
     ];
 
-    const TAB_LABELS = ["📝 紹介文", "𝕏 X投稿", "📖 sizu"];
-    const TAB_KEYS = ["short", "x", "sizu"];
+    const TAB_LABELS = ["📝 紹介文", "𝕏 X投稿", "📖 sizu", "🏢 シフトバ", "💬 いちゃ部屋"];
+    const TAB_KEYS = ["short", "x", "sizu", "shifutoba", "ichaya"];
+
+    const SPLIT_TABS = ["sizu", "shifutoba", "ichaya"];
+
+    function extractSizuTitle(text) {
+      const m = text.match(/^\*\*(.+?)\*\*/);
+      return m ? m[1] : "";
+    }
+    function extractSizuBody(text) {
+      return text.replace(/^\*\*.+?\*\*\n\n?/, "");
+    }
+    function toIchayaFormat(text) {
+      return text.replace(/^\*\*(.+?)\*\*/, "■$1");
+    }
 
     function getTodayDayIndex(startDate) {
       if (!startDate) return null;
@@ -178,6 +191,40 @@
       });
     }
 
+    // ===== SplitCopyPanel =====
+    function SplitCopyPanel({ article, tabKey }) {
+      const [copiedTitle, setCopiedTitle] = React.useState(false);
+      const [copiedBody, setCopiedBody] = React.useState(false);
+      const base = tabKey === "ichaya" ? toIchayaFormat(article.sizu) : article.sizu;
+      const rawTitle = extractSizuTitle(article.sizu);
+      const titleFormatted = tabKey === "ichaya" ? "■" + rawTitle : rawTitle;
+      const bodyText = extractSizuBody(base);
+      return (
+        <div className="space-y-3">
+          <div className="bg-stone-50 rounded-lg px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-stone-500">タイトル</span>
+              <button onClick={() => { copyToClipboard(titleFormatted); setCopiedTitle(true); setTimeout(()=>setCopiedTitle(false),2000); }}
+                className="text-xs bg-stone-700 hover:bg-stone-500 text-white px-3 py-1 rounded-full transition-colors">
+                {copiedTitle ? "コピーしました ✓" : "コピー"}
+              </button>
+            </div>
+            <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{titleFormatted}</pre>
+          </div>
+          <div className="bg-stone-50 rounded-lg px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-stone-500">本文</span>
+              <button onClick={() => { copyToClipboard(bodyText); setCopiedBody(true); setTimeout(()=>setCopiedBody(false),2000); }}
+                className="text-xs bg-stone-700 hover:bg-stone-500 text-white px-3 py-1 rounded-full transition-colors">
+                {copiedBody ? "コピーしました ✓" : "コピー"}
+              </button>
+            </div>
+            <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{bodyText}</pre>
+          </div>
+        </div>
+      );
+    }
+
     // ===== ArticleCard =====
     function ArticleCard({ article, dayIndex, isToday, startDate, releaseStatus, onToggleRelease, onEdit, onRegenerate }) {
       const [activeTab, setActiveTab] = React.useState(0);
@@ -186,9 +233,17 @@
       const isTabReleased = releaseStatus?.[tabKey];
       const allReleased = TAB_KEYS.every(k => releaseStatus?.[k]);
       const releaseDate = startDate ? dateFromDayIndex(startDate, dayIndex) : null;
+      const isSplitTab = SPLIT_TABS.includes(tabKey);
+
+      function getTabContent() {
+        if (tabKey === "shifutoba") return article.sizu;
+        if (tabKey === "ichaya") return toIchayaFormat(article.sizu);
+        return article[tabKey] || "";
+      }
+      const tabContent = getTabContent();
 
       const handleCopy = () => {
-        copyToClipboard(article[tabKey]);
+        copyToClipboard(tabContent);
         setCopied(true); setTimeout(() => setCopied(false), 2000);
       };
 
@@ -212,26 +267,32 @@
               </div>
             </div>
           </div>
-          <div className="flex border-b border-stone-200 px-4 gap-1">
+          <div className="flex border-b border-stone-200 px-2 gap-0 overflow-x-auto">
             {TAB_LABELS.map((label, i) => (
               <button key={i} onClick={() => setActiveTab(i)}
-                className={`text-xs py-2 px-3 border-b-2 transition-colors flex items-center gap-1 ${activeTab === i ? "border-amber-500 text-amber-700 font-bold" : "border-transparent text-stone-400 hover:text-stone-600"}`}>
+                className={`text-xs py-2 px-2 border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${activeTab === i ? "border-amber-500 text-amber-700 font-bold" : "border-transparent text-stone-400 hover:text-stone-600"}`}>
                 {label}{releaseStatus?.[TAB_KEYS[i]] && <span className="text-emerald-500">✓</span>}
               </button>
             ))}
           </div>
           <div className="px-5 py-4">
-            <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{article[tabKey]}</pre>
+            {isSplitTab ? (
+              <SplitCopyPanel article={article} tabKey={tabKey} />
+            ) : (
+              <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{tabContent}</pre>
+            )}
             <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-              <span className="text-xs text-stone-400">{(article[tabKey] || "").replace(/\s/g,"").length}文字</span>
+              <span className="text-xs text-stone-400">{tabContent.replace(/\s/g,"").length}文字</span>
               <div className="flex items-center gap-2">
                 <button onClick={() => onToggleRelease(dayIndex, tabKey)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${isTabReleased ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
                   {isTabReleased ? "✓ リリース済み" : "リリース済みにする"}
                 </button>
-                <button onClick={handleCopy} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full transition-colors">
-                  {copied ? "コピーしました ✓" : "コピー"}
-                </button>
+                {!isSplitTab && (
+                  <button onClick={handleCopy} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full transition-colors">
+                    {copied ? "コピーしました ✓" : "コピー"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -260,7 +321,11 @@
         if (dayIndex === null) return 0;
         const rs = releaseStatus[dayIndex];
         if (!rs) return 0;
-        return TAB_KEYS.filter(k => rs[k]).length;
+        const count = TAB_KEYS.filter(k => rs[k]).length;
+        if (count === 0) return 0;
+        if (count <= 2) return 1;
+        if (count <= 4) return 2;
+        return 3;
       }
 
       const cells = [];
@@ -489,6 +554,13 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const [activeTab, setActiveTab] = React.useState(0);
       const [copied, setCopied] = React.useState(false);
       const tabKey = TAB_KEYS[activeTab];
+      const isSplitTab = SPLIT_TABS.includes(tabKey);
+      function getTabContent() {
+        if (tabKey === "shifutoba") return article.sizu;
+        if (tabKey === "ichaya") return toIchayaFormat(article.sizu);
+        return article[tabKey] || "";
+      }
+      const tabContent = getTabContent();
       return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -502,22 +574,28 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
                 <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
               </div>
             </div>
-            <div className="flex border-b border-stone-200 px-4 gap-1">
+            <div className="flex border-b border-stone-200 px-2 gap-0 overflow-x-auto">
               {TAB_LABELS.map((label,i) => (
-                <button key={i} onClick={() => setActiveTab(i)} className={`text-xs py-3 px-3 border-b-2 transition-colors flex items-center gap-1 ${activeTab===i?"border-amber-500 text-amber-700 font-bold":"border-transparent text-stone-400 hover:text-stone-600"}`}>
+                <button key={i} onClick={() => setActiveTab(i)} className={`text-xs py-3 px-2 border-b-2 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${activeTab===i?"border-amber-500 text-amber-700 font-bold":"border-transparent text-stone-400 hover:text-stone-600"}`}>
                   {label}{releaseStatus?.[TAB_KEYS[i]]&&<span className="text-emerald-500">✓</span>}
                 </button>
               ))}
             </div>
             <div className="px-6 py-5">
-              <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{article[tabKey]}</pre>
+              {isSplitTab ? (
+                <SplitCopyPanel article={article} tabKey={tabKey} />
+              ) : (
+                <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{tabContent}</pre>
+              )}
               <div className="flex items-center justify-between mt-4">
                 <button onClick={() => onToggleRelease(dayIndex,tabKey)} className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${releaseStatus?.[tabKey]?"bg-emerald-100 text-emerald-700 border-emerald-300":"bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
                   {releaseStatus?.[tabKey]?"✓ リリース済み":"リリース済みにする"}
                 </button>
-                <button onClick={() => {copyToClipboard(article[tabKey]);setCopied(true);setTimeout(()=>setCopied(false),2000);}} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full">
-                  {copied?"コピーしました ✓":"コピー"}
-                </button>
+                {!isSplitTab && (
+                  <button onClick={() => {copyToClipboard(tabContent);setCopied(true);setTimeout(()=>setCopied(false),2000);}} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full">
+                    {copied?"コピーしました ✓":"コピー"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
