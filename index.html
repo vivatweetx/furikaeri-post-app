@@ -67,15 +67,25 @@
       await signOut(auth);
     };
 
-    // 認証状態の監視
+    // 認証状態の監視（リダイレクト結果を待ってから開始）
     window.fbOnAuthChange = (callback) => {
-      onAuthStateChanged(auth, (user) => {
-        if (user && ALLOWED_EMAILS.includes(user.email)) {
-          callback({ user });
-        } else {
-          if (user) signOut(auth); // 許可外アカウントは強制ログアウト
-          callback({ user: null });
+      // まずリダイレクト結果を処理し、その後onAuthStateChangedで状態を確認
+      getRedirectResult(auth).then((result) => {
+        if (result && result.user) {
+          const email = result.user.email;
+          if (!ALLOWED_EMAILS.includes(email)) {
+            signOut(auth);
+          }
         }
+      }).catch(() => {}).finally(() => {
+        onAuthStateChanged(auth, (user) => {
+          if (user && ALLOWED_EMAILS.includes(user.email)) {
+            callback({ user });
+          } else {
+            if (user) signOut(auth);
+            callback({ user: null });
+          }
+        });
       });
     };
 
@@ -580,15 +590,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const [loaded, setLoaded] = useState(false);
       const [syncStatus, setSyncStatus] = useState("idle");
 
-      // 認証状態の監視 & リダイレクト結果処理
+      // 認証状態の監視
       useEffect(() => {
-        const setup = async () => {
-          // リダイレクト後の結果を処理
-          if (window.fbHandleRedirect) {
-            const r = await window.fbHandleRedirect();
-            if (r.error) setLoginError(r.error);
-          }
-          // 認証状態の監視開始
+        const setup = () => {
           window.fbOnAuthChange(({ user }) => {
             setUser(user);
             setAuthLoading(false);
