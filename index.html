@@ -67,22 +67,35 @@
       await signOut(auth);
     };
 
-    // 認証状態の監視（リダイレクト結果を待ってから開始）
+    // 認証状態の監視（デバッグログ付き）
     window.fbOnAuthChange = (callback) => {
-      // まずリダイレクト結果を処理し、その後onAuthStateChangedで状態を確認
+      console.log("[Auth] fbOnAuthChange 開始");
       getRedirectResult(auth).then((result) => {
+        console.log("[Auth] getRedirectResult 結果:", result);
         if (result && result.user) {
+          console.log("[Auth] リダイレクトユーザー:", result.user.email);
           const email = result.user.email;
           if (!ALLOWED_EMAILS.includes(email)) {
+            console.log("[Auth] 許可外メール、サインアウト");
             signOut(auth);
           }
+        } else {
+          console.log("[Auth] リダイレクト結果なし（通常アクセスか既ログイン）");
         }
-      }).catch(() => {}).finally(() => {
+      }).catch((e) => {
+        console.log("[Auth] getRedirectResult エラー:", e.code, e.message);
+      }).finally(() => {
+        console.log("[Auth] onAuthStateChanged 開始");
         onAuthStateChanged(auth, (user) => {
+          console.log("[Auth] onAuthStateChanged 発火 user:", user ? user.email : "null");
           if (user && ALLOWED_EMAILS.includes(user.email)) {
+            console.log("[Auth] 認証成功:", user.email);
             callback({ user });
           } else {
-            if (user) signOut(auth);
+            if (user) {
+              console.log("[Auth] 許可外ユーザー強制ログアウト:", user.email);
+              signOut(auth);
+            }
             callback({ user: null });
           }
         });
