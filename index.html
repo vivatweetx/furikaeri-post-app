@@ -10,7 +10,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // ===== 🔥 Firebase設定 =====
@@ -36,29 +36,18 @@
     const DOC_ID = "furikaeri_data";
 
     // ログイン（リダイレクト方式）
+    // ログイン（ポップアップ方式）
     window.fbSignIn = async () => {
       try {
-        await signInWithRedirect(auth, provider);
-        return {};
+        const result = await signInWithPopup(auth, provider);
+        const email = result.user.email;
+        if (!ALLOWED_EMAILS.includes(email)) {
+          await signOut(auth);
+          return { error: `このアカウント（${email}）はアクセス権限がありません。` };
+        }
+        return { user: result.user };
       } catch(e) {
         return { error: "ログインに失敗しました: " + e.message };
-      }
-    };
-
-    // リダイレクト後の結果処理
-    window.fbHandleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const email = result.user.email;
-          if (!ALLOWED_EMAILS.includes(email)) {
-            await signOut(auth);
-            return { error: `このアカウント（${email}）はアクセス権限がありません。` };
-          }
-        }
-        return {};
-      } catch(e) {
-        return { error: "ログイン処理エラー: " + e.message };
       }
     };
 
@@ -67,38 +56,15 @@
       await signOut(auth);
     };
 
-    // 認証状態の監視（デバッグログ付き）
+    // 認証状態の監視
     window.fbOnAuthChange = (callback) => {
-      console.log("[Auth] fbOnAuthChange 開始");
-      getRedirectResult(auth).then((result) => {
-        console.log("[Auth] getRedirectResult 結果:", result);
-        if (result && result.user) {
-          console.log("[Auth] リダイレクトユーザー:", result.user.email);
-          const email = result.user.email;
-          if (!ALLOWED_EMAILS.includes(email)) {
-            console.log("[Auth] 許可外メール、サインアウト");
-            signOut(auth);
-          }
+      onAuthStateChanged(auth, (user) => {
+        if (user && ALLOWED_EMAILS.includes(user.email)) {
+          callback({ user });
         } else {
-          console.log("[Auth] リダイレクト結果なし（通常アクセスか既ログイン）");
+          if (user) signOut(auth);
+          callback({ user: null });
         }
-      }).catch((e) => {
-        console.log("[Auth] getRedirectResult エラー:", e.code, e.message);
-      }).finally(() => {
-        console.log("[Auth] onAuthStateChanged 開始");
-        onAuthStateChanged(auth, (user) => {
-          console.log("[Auth] onAuthStateChanged 発火 user:", user ? user.email : "null");
-          if (user && ALLOWED_EMAILS.includes(user.email)) {
-            console.log("[Auth] 認証成功:", user.email);
-            callback({ user });
-          } else {
-            if (user) {
-              console.log("[Auth] 許可外ユーザー強制ログアウト:", user.email);
-              signOut(auth);
-            }
-            callback({ user: null });
-          }
-        });
       });
     };
 
@@ -616,11 +582,15 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
         return () => window.removeEventListener("firebase-ready", setup);
       }, []);
 
-      // ログイン処理（リダイレクト）
+      // ログイン処理
       const handleLogin = async () => {
         setLoginLoading(true);
         setLoginError("");
-        await window.fbSignIn(); // リダイレクトするので戻らない
+        const result = await window.fbSignIn();
+        if (result.error) {
+          setLoginError(result.error);
+          setLoginLoading(false);
+        }
       };
 
       // ログアウト処理
