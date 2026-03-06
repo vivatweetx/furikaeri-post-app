@@ -23,10 +23,6 @@
       appId: "1:452191460927:web:ee96fe6e45fc91e7b7a28a"
     };
 
-    // ===== 🔐 許可するGoogleアカウントのメールアドレス =====
-    const ALLOWED_EMAILS = [
-      "viva.tweet.x@gmail.com"
-    ];
     // ===== 設定ここまで =====
 
     const app = initializeApp(firebaseConfig);
@@ -40,11 +36,6 @@
     window.fbSignIn = async () => {
       try {
         const result = await signInWithPopup(auth, provider);
-        const email = result.user.email;
-        if (!ALLOWED_EMAILS.includes(email)) {
-          await signOut(auth);
-          return { error: `このアカウント（${email}）はアクセス権限がありません。` };
-        }
         return { user: result.user };
       } catch(e) {
         return { error: "ログインに失敗しました: " + e.message };
@@ -59,12 +50,7 @@
     // 認証状態の監視
     window.fbOnAuthChange = (callback) => {
       onAuthStateChanged(auth, (user) => {
-        if (user && ALLOWED_EMAILS.includes(user.email)) {
-          callback({ user });
-        } else {
-          if (user) signOut(auth);
-          callback({ user: null });
-        }
+        callback({ user: user || null });
       });
     };
 
