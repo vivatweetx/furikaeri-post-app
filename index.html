@@ -153,19 +153,78 @@
       return text.replace(/^\*\*(.+?)\*\*/, "■$1");
     }
 
+    // ===== 日本の祝日 =====
+    const JP_HOLIDAYS = new Set([
+      // 2025年
+      "2025-01-01","2025-01-13","2025-02-11","2025-02-23","2025-02-24",
+      "2025-03-20","2025-04-29","2025-05-03","2025-05-04","2025-05-05","2025-05-06",
+      "2025-07-21","2025-08-11","2025-09-15","2025-09-23","2025-10-13",
+      "2025-11-03","2025-11-23","2025-11-24",
+      // 2026年
+      "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20",
+      "2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06",
+      "2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23","2026-10-12",
+      "2026-11-03","2026-11-23",
+      // 2027年
+      "2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-21",
+      "2027-04-29","2027-05-03","2027-05-04","2027-05-05",
+      "2027-07-19","2027-08-11","2027-09-20","2027-09-23","2027-10-11",
+      "2027-11-03","2027-11-23",
+    ]);
+
+    function isHoliday(date) {
+      const dow = date.getDay();
+      if (dow === 0 || dow === 6) return true; // 日・土
+      const str = date.toISOString().split("T")[0];
+      return JP_HOLIDAYS.has(str);
+    }
+
+    // dayIndex番目（0始まり）の平日日付を返す
+    function dateFromDayIndex(startDate, dayIndex) {
+      if (!startDate) return null;
+      const d = new Date(startDate);
+      d.setHours(0,0,0,0);
+      let count = 0;
+      while (count < dayIndex) {
+        d.setDate(d.getDate() + 1);
+        if (!isHoliday(d)) count++;
+      }
+      return d.toISOString().split("T")[0];
+    }
+
+    // 今日が何番目の平日か（startDateから数えて）
     function getTodayDayIndex(startDate) {
       if (!startDate) return null;
       const start = new Date(startDate);
       const today = new Date();
       start.setHours(0,0,0,0); today.setHours(0,0,0,0);
-      return Math.floor((today - start) / 86400000);
+      if (today < start) return -1;
+      let count = 0;
+      const d = new Date(start);
+      while (d < today) {
+        d.setDate(d.getDate() + 1);
+        if (!isHoliday(d)) count++;
+      }
+      // todayがstartと同じ日（Day 0）
+      if (today.getTime() === start.getTime()) return 0;
+      return count;
     }
 
-    function dateFromDayIndex(startDate, dayIndex) {
+    // 日付文字列→dayIndex（平日カウント）
+    function dateStrToDayIndex(startDate, dateStr) {
       if (!startDate) return null;
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + dayIndex);
-      return d.toISOString().split("T")[0];
+      const start = new Date(startDate);
+      const target = new Date(dateStr);
+      start.setHours(0,0,0,0); target.setHours(0,0,0,0);
+      if (target < start) return null;
+      if (isHoliday(target)) return null; // 土日祝は記事なし
+      let count = 0;
+      const d = new Date(start);
+      while (d < target) {
+        d.setDate(d.getDate() + 1);
+        if (!isHoliday(d)) count++;
+      }
+      return count;
     }
 
     function copyToClipboard(text) {
@@ -315,10 +374,9 @@
 
       function getDayIndex(dateStr) {
         if (!startDate) return null;
-        const start = new Date(startDate), d = new Date(dateStr);
-        start.setHours(0,0,0,0); d.setHours(0,0,0,0);
-        const diff = Math.floor((d - start) / 86400000);
-        return diff >= 0 && diff < articles.length ? diff : null;
+        const idx = dateStrToDayIndex(startDate, dateStr);
+        if (idx === null) return null;
+        return idx < articles.length ? idx : null;
       }
 
       function getReleaseLevel(dayIndex) {
@@ -356,11 +414,14 @@
               const level = getReleaseLevel(dayIndex);
               const isToday = dateStr === todayStr;
               const hasArticle = dayIndex !== null;
+              const dateObj = new Date(dateStr);
+              const isWeekendOrHoliday = isHoliday(dateObj);
               const bg = level===3?"bg-emerald-500 text-white":level===2?"bg-emerald-200 text-emerald-900":level===1?"bg-amber-200 text-amber-900":hasArticle?"bg-stone-100 hover:bg-stone-200":"";
+              const textColor = !hasArticle ? (isWeekendOrHoliday ? "text-stone-200" : "text-stone-300") : "";
               return (
                 <div key={i} className="p-1 flex justify-center items-center">
                   <button onClick={() => hasArticle && onSelectDay(dayIndex)} disabled={!hasArticle}
-                    className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${bg} ${isToday?"ring-2 ring-amber-500 ring-offset-1":""} ${!hasArticle?"text-stone-300":""}`}>
+                    className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${bg} ${isToday?"ring-2 ring-amber-500 ring-offset-1":""} ${textColor}`}>
                     {day}
                   </button>
                 </div>
@@ -747,7 +808,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const filteredArticles = articles.filter((_,i) => {
         if (view==="today") return i===todayIndex;
         if (view==="upcoming") return todayIndex!==null && i>todayIndex;
-        if (view==="released") return todayIndex!==null && i<=todayIndex;
+        if (view==="released") return todayIndex!==null && i<todayIndex;
         return true;
       });
 
