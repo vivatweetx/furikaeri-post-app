@@ -744,6 +744,14 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
         setLoaded(false);
       };
 
+      // 更新（初期データでFirebaseを上書き）
+      const handleUpdate = async () => {
+        if (!window.confirm("ソースコードの最新データでFirebaseを上書きします。よろしいですか？")) return;
+        const next = INITIAL_ARTICLES;
+        setArticles(next);
+        await saveToFirebase(next, startDate, releaseStatus);
+      };
+
       // Firebase経由でロード（ログイン後）
       useEffect(() => {
         if (!user) return;
@@ -845,6 +853,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
               <div className="flex items-center gap-3">
                 {syncBadge && <span className={`text-xs font-bold ${syncColor}`}>{syncBadge}</span>}
                 <button onClick={() => setShowGenerateMore(true)} className="text-xs bg-amber-500 hover:bg-amber-400 text-white font-bold px-3 py-1.5 rounded-full transition-colors">+ 記事を追加</button>
+                <button onClick={handleUpdate} title="ソースコードの最新データでFirebaseを上書き" className="text-xs text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 px-2 py-1.5 rounded-lg transition-colors">
+                  更新
+                </button>
                 <button onClick={handleLogout} title="ログアウト" className="text-xs text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 px-2 py-1.5 rounded-lg transition-colors">
                   ログアウト
                 </button>
