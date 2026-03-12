@@ -127,7 +127,7 @@
         x: "【手法：+/Δ（プラス/デルタ）の紹介】\nふりかえりをよくするにはどうすればいい？→ふりかえりそのものをふりかえればいい。「よかったところ（＋）」と「改善したいところ（Δ）」を5分話すだけ。シンプルだけど効くんです。\n#ふりかえり",
         sizu: "**+/Δ：ふりかえりをカイゼンするための、ふりかえり**\n\n「ふりかえりをよくするにはどうすればいいですか？」という質問をよく受けます。\n\n答えはシンプルで、ふりかえりそのものをふりかえればいいんです。それが+/Δ（プラス/デルタ）という手法です。\n\n「今日のふりかえり、よかったところ（＋）」と「改善したいところ（Δ）」を、5分だけ話し合います。ホワイトボードを二分割して、意見のある人からどんどん言っていくだけ。\n\nこの手法のポイントは「テンポよく続けること」です。毎回やる必要はありません。4〜8回に1回くらい+/Δの時間をとるだけでいい。\n\nやってみよう：直近のふりかえり、よかったところと「次はこうしたい」と思ったところはそれぞれ何ですか？" },
       { id: 7, type: "TIPS", title: "「毎日同じレベルで書ききろう」としなくていい",
-        short: "毎日ふりかえりを続けていると、「今日は全然書けなかった」という日が出てきます。\nそれ、全然OKです。\n\n大事なのはレベルを保つことじゃなくて、続けること。\n適当に書く日があっても、ちょっとだけの日があっても、それで十分。\n\nやってみよう：昨日の自分を、ちゃんと認めてあげてください。",
+        short: "毎日ふりかえりを続けていると、「今日は全然書けなかった」という日が出てきます。\n不安にならないでください。それでも、大丈夫です。\n\n大事なのはレベルを保つことじゃなくて、続けること。\n適当に書く日があっても、ちょっとだけの日があっても、それで十分。\n\nやってみよう：昨日の自分で、ちょっとでも「できた」と思う部分はどこでしょうか？\n自分を認められる部分はどこでしょうか？考えてみましょう",
         x: "【ふりかえりTIPS】\n「今日は全然書けなかった」という日があっても、全然OK。大事なのはレベルを保つことじゃなくて、続けること。ちょっとだけの日があっていい。「全部やりきらなければ」という呪縛、そろそろ手放しましょう。\n#ふりかえり",
         sizu: "**「毎日同じレベルで書ききろう」としなくていい**\n\n毎日ふりかえりを続けていると、必ず「今日は全然書けなかった」「なんか適当になってしまった」という日が出てきます。\n\nそれ、全然OKです。\n\n大事なのは、毎回完璧に書くことじゃなくて、続けること。\n\nちょっとだけ書いてもいい。箇条書き1行でもいい。「今日は疲れた」の1文でもいい。ゼロよりずっといいんです。\n\n無理しないことが、長く続ける一番のコツだと思っています。適当な日を責めるのではなく、「今日も続けた」という事実を、ちゃんと認めてあげてください。\n\nやってみよう：最近のふりかえりで「適当になった」と感じた日はありましたか？それでも続けられている自分を、ちゃんと認めてあげてください。" },
     ];
@@ -237,13 +237,19 @@
     }
 
     // ===== SplitCopyPanel =====
-    function SplitCopyPanel({ article, tabKey }) {
+    function SplitCopyPanel({ article, tabKey, onCopyBody }) {
       const [copiedTitle, setCopiedTitle] = React.useState(false);
       const [copiedBody, setCopiedBody] = React.useState(false);
       const base = tabKey === "ichaya" ? toIchayaFormat(article.sizu) : article.sizu;
       const rawTitle = extractSizuTitle(article.sizu);
       const titleFormatted = tabKey === "ichaya" ? "■" + rawTitle : rawTitle;
       const bodyText = extractSizuBody(base);
+      const handleBodyCopy = () => {
+        copyToClipboard(bodyText);
+        setCopiedBody(true);
+        setTimeout(() => setCopiedBody(false), 2000);
+        if (onCopyBody) onCopyBody();
+      };
       // いちゃ部屋は本文のみ
       if (tabKey === "ichaya") {
         return (
@@ -251,7 +257,7 @@
             <div className="bg-stone-50 rounded-lg px-4 py-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-stone-500">本文</span>
-                <button onClick={() => { copyToClipboard(bodyText); setCopiedBody(true); setTimeout(()=>setCopiedBody(false),2000); }}
+                <button onClick={handleBodyCopy}
                   className="text-xs bg-stone-700 hover:bg-stone-500 text-white px-3 py-1 rounded-full transition-colors">
                   {copiedBody ? "コピーしました ✓" : "コピー"}
                 </button>
@@ -276,7 +282,7 @@
           <div className="bg-stone-50 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold text-stone-500">本文</span>
-              <button onClick={() => { copyToClipboard(bodyText); setCopiedBody(true); setTimeout(()=>setCopiedBody(false),2000); }}
+              <button onClick={handleBodyCopy}
                 className="text-xs bg-stone-700 hover:bg-stone-500 text-white px-3 py-1 rounded-full transition-colors">
                 {copiedBody ? "コピーしました ✓" : "コピー"}
               </button>
@@ -308,6 +314,7 @@
       const handleCopy = () => {
         copyToClipboard(tabContent);
         setCopied(true); setTimeout(() => setCopied(false), 2000);
+        onToggleRelease(dayIndex, tabKey);
       };
 
       return (
@@ -340,17 +347,14 @@
           </div>
           <div className="px-5 py-4">
             {isSplitTab ? (
-              <SplitCopyPanel article={article} tabKey={tabKey} />
+              <SplitCopyPanel article={article} tabKey={tabKey} onCopyBody={() => onToggleRelease(dayIndex, tabKey)} />
             ) : (
               <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{tabContent}</pre>
             )}
             <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
               <span className="text-xs text-stone-400">{tabContent.replace(/\s/g,"").length}文字</span>
               <div className="flex items-center gap-2">
-                <button onClick={() => onToggleRelease(dayIndex, tabKey)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${isTabReleased ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
-                  {isTabReleased ? "✓ リリース済み" : "リリース済みにする"}
-                </button>
+                {isTabReleased && <span className="text-xs text-emerald-600 font-bold">✓ リリース済み</span>}
                 {!isSplitTab && (
                   <button onClick={handleCopy} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full transition-colors">
                     {copied ? "コピーしました ✓" : "コピー"}
@@ -481,7 +485,7 @@
 【記事タイプ】${article.type}
 【現在のタイトル】${article.title}
 ${customRequest ? `【追加要望】${customRequest}` : ""}
-【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（」。）は使わない
+【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみで返してください（マークダウンのコードブロック不要）
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：の質問で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く。顔文字なし","sizu":"sizu記事（600文字以内）"}`;
           const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -559,7 +563,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
             const prompt = `あなたはふりかえりエバンジェリストの森一樹（@viva_tweet_x）です。
 毎日ふりかえりをしている人向けに「Day ${dayNum}」の投稿記事を作成してください。
 【記事タイプ】${tmpl.type}【テーマヒント】${topicHint}
-【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（」。）は使わない
+【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみ（マークダウンのコードブロック不要）
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く","sizu":"sizu記事（600文字以内）"}`;
             const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -649,16 +653,14 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
             </div>
             <div className="px-6 py-5">
               {isSplitTab ? (
-                <SplitCopyPanel article={article} tabKey={tabKey} />
+                <SplitCopyPanel article={article} tabKey={tabKey} onCopyBody={() => onToggleRelease(dayIndex, tabKey)} />
               ) : (
                 <pre className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{tabContent}</pre>
               )}
               <div className="flex items-center justify-between mt-4">
-                <button onClick={() => onToggleRelease(dayIndex,tabKey)} className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${releaseStatus?.[tabKey]?"bg-emerald-100 text-emerald-700 border-emerald-300":"bg-white text-stone-500 border-stone-300 hover:border-stone-500"}`}>
-                  {releaseStatus?.[tabKey]?"✓ リリース済み":"リリース済みにする"}
-                </button>
+                {releaseStatus?.[tabKey] && <span className="text-xs text-emerald-600 font-bold">✓ リリース済み</span>}
                 {!isSplitTab && (
-                  <button onClick={() => {copyToClipboard(tabContent);setCopied(true);setTimeout(()=>setCopied(false),2000);}} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full">
+                  <button onClick={() => {copyToClipboard(tabContent);setCopied(true);setTimeout(()=>setCopied(false),2000);onToggleRelease(dayIndex,tabKey);}} className="text-xs bg-stone-800 hover:bg-stone-600 text-white px-4 py-1.5 rounded-full">
                     {copied?"コピーしました ✓":"コピー"}
                   </button>
                 )}
