@@ -138,6 +138,8 @@
     ];
 
     const TAB_LABELS = ["📝 ふりかえり部", "𝕏 X投稿", "📖 sizu", "🏢 シフトバ", "💬 いちゃ部屋"];
+    const PROXY_URL = "https://furikaeri-post-app.vercel.app/api/anthropic";
+
     const TAB_KEYS = ["short", "x", "sizu", "shifutoba", "ichaya"];
 
     const SPLIT_TABS = ["sizu", "shifutoba", "ichaya"];
@@ -505,7 +507,6 @@
       const [customRequest, setCustomRequest] = React.useState("");
 
       const doGenerate = async () => {
-        if (!apiKey) { setError("APIキーが設定されていません。ヘッダーの🔑ボタンから設定してください。"); return; }
         setLoading(true); setError(""); setResult(null);
         try {
           const prompt = `あなたはふりかえりエバンジェリストの森一樹（@viva_tweet_x）です。
@@ -516,9 +517,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
 【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみで返してください（マークダウンのコードブロック不要）
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：の質問で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く。顔文字なし","sizu":"sizu記事（600文字以内）"}`;
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
+          const res = await fetch(PROXY_URL, {
             method: "POST",
-            headers: {"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+            headers: {"Content-Type":"application/json"},
             body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] })
           });
           const data = await res.json();
@@ -581,7 +582,6 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const [error, setError] = React.useState("");
 
       const handleGenerate = async () => {
-        if (!apiKey) { setError("APIキーが設定されていません。ヘッダーの🔑ボタンから設定してください。"); return; }
         setLoading(true); setError(""); setProgress(0);
         const newArticles = [];
         try {
@@ -595,8 +595,8 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
 【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみ（マークダウンのコードブロック不要）
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く","sizu":"sizu記事（600文字以内）"}`;
-            const res = await fetch("https://api.anthropic.com/v1/messages", {
-              method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+            const res = await fetch(PROXY_URL, {
+              method:"POST", headers:{"Content-Type":"application/json"},
               body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
             });
             const data = await res.json();
