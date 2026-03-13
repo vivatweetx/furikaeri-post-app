@@ -470,14 +470,42 @@
       );
     }
 
+    // ===== ApiKeyModal =====
+    function ApiKeyModal({ onSave, onClose, current }) {
+      const [val, setVal] = React.useState(current || "");
+      return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+              <h3 className="font-bold text-stone-800">Anthropic APIキーの設定</h3>
+              {onClose && <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>}
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-stone-600">AI記事生成に使用するAnthropic APIキーを入力してください。このデバイスのブラウザにのみ保存されます。</p>
+              <input type="password" value={val} onChange={e=>setVal(e.target.value)}
+                placeholder="sk-ant-..."
+                className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono" />
+              <p className="text-xs text-stone-400">※ APIキーは<a href="https://console.anthropic.com/" target="_blank" className="text-amber-600 underline">Anthropic Console</a>から取得できます。</p>
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex justify-end gap-3">
+              {onClose && <button onClick={onClose} className="text-sm text-stone-500 hover:text-stone-800 px-4 py-2">キャンセル</button>}
+              <button onClick={() => { if(val.trim()) onSave(val.trim()); }} disabled={!val.trim()}
+                className="text-sm bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white font-bold px-6 py-2 rounded-full">保存する</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // ===== RegenModal =====
-    function RegenModal({ article, onRegenerate, onClose }) {
+    function RegenModal({ article, apiKey, onRegenerate, onClose }) {
       const [loading, setLoading] = React.useState(false);
       const [result, setResult] = React.useState(null);
       const [error, setError] = React.useState("");
       const [customRequest, setCustomRequest] = React.useState("");
 
       const doGenerate = async () => {
+        if (!apiKey) { setError("APIキーが設定されていません。ヘッダーの🔑ボタンから設定してください。"); return; }
         setLoading(true); setError(""); setResult(null);
         try {
           const prompt = `あなたはふりかえりエバンジェリストの森一樹（@viva_tweet_x）です。
@@ -490,7 +518,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：の質問で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く。顔文字なし","sizu":"sizu記事（600文字以内）"}`;
           const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
-            headers: {"Content-Type":"application/json"},
+            headers: {"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
             body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] })
           });
           const data = await res.json();
@@ -546,13 +574,14 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
     }
 
     // ===== GenerateMoreModal =====
-    function GenerateMoreModal({ currentCount, onGenerate, onClose }) {
+    function GenerateMoreModal({ currentCount, apiKey, onGenerate, onClose }) {
       const [count, setCount] = React.useState(7);
       const [loading, setLoading] = React.useState(false);
       const [progress, setProgress] = React.useState(0);
       const [error, setError] = React.useState("");
 
       const handleGenerate = async () => {
+        if (!apiKey) { setError("APIキーが設定されていません。ヘッダーの🔑ボタンから設定してください。"); return; }
         setLoading(true); setError(""); setProgress(0);
         const newArticles = [];
         try {
@@ -567,7 +596,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
 【出力形式】JSONのみ（マークダウンのコードブロック不要）
 {"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く","sizu":"sizu記事（600文字以内）"}`;
             const res = await fetch("https://api.anthropic.com/v1/messages", {
-              method:"POST", headers:{"Content-Type":"application/json"},
+              method:"POST", headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
               body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
             });
             const data = await res.json();
@@ -704,6 +733,8 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       const [loginLoading, setLoginLoading] = useState(false);
       const [loginError, setLoginError] = useState("");
       const [startDate, setStartDate] = useState(null);
+      const [apiKey, setApiKey] = useState(() => localStorage.getItem("anthropic_api_key") || "");
+      const [showApiKeyModal, setShowApiKeyModal] = useState(false);
       const [articles, setArticles] = useState(INITIAL_ARTICLES);
       const [releaseStatus, setReleaseStatus] = useState({});
       const [view, setView] = useState("today");
@@ -744,6 +775,13 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
         await window.fbSignOut();
         setUser(null);
         setLoaded(false);
+      };
+
+      // APIキー保存
+      const handleApiKeySave = (key) => {
+        localStorage.setItem("anthropic_api_key", key);
+        setApiKey(key);
+        setShowApiKeyModal(false);
       };
 
       // 更新（初期データでFirebaseを上書き）
@@ -855,6 +893,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
               <div className="flex items-center gap-3">
                 {syncBadge && <span className={`text-xs font-bold ${syncColor}`}>{syncBadge}</span>}
                 <button onClick={() => setShowGenerateMore(true)} className="text-xs bg-amber-500 hover:bg-amber-400 text-white font-bold px-3 py-1.5 rounded-full transition-colors">+ 記事を追加</button>
+                <button onClick={() => setShowApiKeyModal(true)} title="Anthropic APIキーの設定" className={`text-xs border px-2 py-1.5 rounded-lg transition-colors ${apiKey ? "text-emerald-600 border-emerald-300 hover:border-emerald-500" : "text-red-500 border-red-300 hover:border-red-500"}`}>
+                  🔑 APIキー{apiKey ? " ✓" : "（未設定）"}
+                </button>
                 <button onClick={handleUpdate} title="ソースコードの最新データでFirebaseを上書き" className="text-xs text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 px-2 py-1.5 rounded-lg transition-colors">
                   更新
                 </button>
@@ -901,8 +942,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
           </main>
 
           {editTarget && <EditModal article={editTarget} onSave={handleEditSave} onClose={() => setEditTarget(null)} />}
-          {regenTarget && <RegenModal article={regenTarget} onRegenerate={handleRegenSave} onClose={() => setRegenTarget(null)} />}
-          {showGenerateMore && <GenerateMoreModal currentCount={articles.length} onGenerate={handleGenerateMore} onClose={() => setShowGenerateMore(false)} />}
+          {regenTarget && <RegenModal article={regenTarget} apiKey={apiKey} onRegenerate={handleRegenSave} onClose={() => setRegenTarget(null)} />}
+          {showApiKeyModal && <ApiKeyModal current={apiKey} onSave={handleApiKeySave} onClose={() => setShowApiKeyModal(false)} />}
+        {showGenerateMore && <GenerateMoreModal currentCount={articles.length} apiKey={apiKey} onGenerate={handleGenerateMore} onClose={() => setShowGenerateMore(false)} />}
           {calendarSelectDay!==null && articles[calendarSelectDay] && (
             <DayDetailModal article={articles[calendarSelectDay]} dayIndex={calendarSelectDay} startDate={startDate} releaseStatus={releaseStatus[calendarSelectDay]||{}} onToggleRelease={handleToggleRelease} onEdit={a=>{setCalendarSelectDay(null);setEditTarget(a);}} onClose={() => setCalendarSelectDay(null)} />
           )}
