@@ -144,14 +144,16 @@
 
     const SPLIT_TABS = ["sizu", "shifutoba", "ichaya"];
 
-    function extractSizuTitle(text) {
+    function extractSizuTitle(text, fallbackTitle) {
       const m = text.match(/^\*\*(.+?)\*\*/);
-      return m ? m[1] : "";
+      if (m) return m[1];
+      return fallbackTitle || "";
     }
     function extractSizuBody(text) {
       return text.replace(/^\*\*.+?\*\*\n\n?/, "");
     }
     function toIchayaFormat(text) {
+      // **タイトル** 形式があれば ■タイトル に変換、なければそのまま
       return text.replace(/^\*\*(.+?)\*\*/, "■$1");
     }
 
@@ -243,7 +245,7 @@
       const [copiedTitle, setCopiedTitle] = React.useState(false);
       const [copiedBody, setCopiedBody] = React.useState(false);
       const base = tabKey === "ichaya" ? toIchayaFormat(article.sizu) : article.sizu;
-      const rawTitle = extractSizuTitle(article.sizu);
+      const rawTitle = extractSizuTitle(article.sizu, article.title);
       const titleFormatted = tabKey === "ichaya" ? "■" + rawTitle : rawTitle;
       const bodyText = extractSizuBody(base);
       const handleBodyCopy = () => {
@@ -308,7 +310,13 @@
       function getTabContent() {
         if (tabKey === "shifutoba") return article.sizu;
         if (tabKey === "ichaya") return toIchayaFormat(article.sizu);
-        if (tabKey === "short") return article.type === "TIPS" ? "【不定期ポスト】\n" + (article[tabKey] || "") : (article[tabKey] || "");
+        if (tabKey === "short") {
+          const shortText = article[tabKey] || "";
+          if (article.type === "TIPS") return "【不定期ポスト】\n" + shortText;
+          // 手法記事で冒頭に手法名ヘッダーがない場合は補完
+          if (!shortText.startsWith("今回は手法")) return "今回は手法「" + article.title + "」の紹介です！\n" + shortText;
+          return shortText;
+        }
         return article[tabKey] || "";
       }
       const tabContent = getTabContent();
@@ -516,7 +524,7 @@
 ${customRequest ? `【追加要望】${customRequest}` : ""}
 【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみで返してください（マークダウンのコードブロック不要）
-{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：の質問で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く。顔文字なし","sizu":"sizu記事（600文字以内）"}`;
+{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：は手法のフレームワークの構成要素を1つ取り出して、読み手がその場で1つだけ答えられる問いにする（例：KPTなら「昨日のKeep（続けたいこと）は何でしたか？」）。やってみよう：の質問で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く。顔文字なし","sizu":"sizu記事（600文字以内）。必ず冒頭を「**タイトル**」の形式で始め、その後に空行を入れてから本文を書く。1文ごとに改行を入れて読みやすくする"}`;
           const res = await fetch(PROXY_URL, {
             method: "POST",
             headers: {"Content-Type":"application/json"},
@@ -594,7 +602,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
 【記事タイプ】${tmpl.type}【テーマヒント】${topicHint}
 【文体】くだけた親しみやすい語り口、読者への問いかけを自然に入れる、具体例を使う、絵文字は1記事1つまで、顔文字（😃など）は使わない、ダッシュ（——）は使わない、「それ、」という文頭の短い受け答えは使わない、「全然OK」は使わず「大丈夫です」等に言い換える
 【出力形式】JSONのみ（マークダウンのコードブロック不要）
-{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く","sizu":"sizu記事（600文字以内）"}`;
+{"title":"タイトル（20文字以内）","short":"紹介文（300文字以内）。typeが手法の場合は冒頭に「今回は手法「{手法名}」の紹介です！」、適度な文字数（20〜30文字程度）で改行を入れる。やってみよう：の前に空白行を1行入れる。やってみよう：の問いは「今日」ではなく「昨日」にする。やってみよう：は手法のフレームワークの構成要素を1つ取り出して、読み手がその場で1つだけ答えられる問いにする（例：KPTなら「昨日のKeep（続けたいこと）は何でしたか？」）。やってみよう：で締める","x":"X投稿（140文字以内）。typeが手法の場合は冒頭に「【手法：{手法名}の紹介】」、typeがTIPSの場合は冒頭に「【ふりかえりTIPS】」を入れる。文末は句点で終え、最終行に#ふりかえりを単独で置く","sizu":"sizu記事（600文字以内）。必ず冒頭を「**タイトル**」の形式で始め、その後に空行を入れてから本文を書く。1文ごとに改行を入れて読みやすくする"}`;
             const res = await fetch(PROXY_URL, {
               method:"POST", headers:{"Content-Type":"application/json"},
               body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
@@ -656,7 +664,13 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
       function getTabContent() {
         if (tabKey === "shifutoba") return article.sizu;
         if (tabKey === "ichaya") return toIchayaFormat(article.sizu);
-        if (tabKey === "short") return article.type === "TIPS" ? "【不定期ポスト】\n" + (article[tabKey] || "") : (article[tabKey] || "");
+        if (tabKey === "short") {
+          const shortText = article[tabKey] || "";
+          if (article.type === "TIPS") return "【不定期ポスト】\n" + shortText;
+          // 手法記事で冒頭に手法名ヘッダーがない場合は補完
+          if (!shortText.startsWith("今回は手法")) return "今回は手法「" + article.title + "」の紹介です！\n" + shortText;
+          return shortText;
+        }
         return article[tabKey] || "";
       }
       const tabContent = getTabContent();
