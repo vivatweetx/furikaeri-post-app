@@ -658,7 +658,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
     }
 
     // ===== DayDetailModal =====
-    function DayDetailModal({ article, dayIndex, startDate, releaseStatus, onToggleRelease, onEdit, onClose }) {
+    function DayDetailModal({ article, dayIndex, startDate, releaseStatus, onToggleRelease, onEdit, onClose, onSkip, todayIndex }) {
       const [activeTab, setActiveTab] = React.useState(0);
       const [copied, setCopied] = React.useState(false);
       const tabKey = TAB_KEYS[activeTab];
@@ -685,6 +685,9 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
                 <h3 className="font-bold text-stone-800">{article.title}</h3>
               </div>
               <div className="flex items-center gap-2">
+                {todayIndex !== null && dayIndex < todayIndex && TAB_KEYS.some(k => !releaseStatus?.[k]) && (
+                  <button onClick={() => { onSkip(dayIndex); onClose(); }} className="text-xs border border-orange-300 text-orange-500 hover:bg-orange-50 rounded px-2 py-1">スキップ</button>
+                )}
                 <button onClick={() => onEdit(article)} className="text-xs border border-stone-200 text-stone-500 hover:text-stone-800 rounded px-2 py-1">編集</button>
                 <button onClick={onClose} className="text-stone-400 hover:text-stone-700 text-xl">✕</button>
               </div>
@@ -989,7 +992,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
           {showApiKeyModal && <ApiKeyModal current={apiKey} onSave={handleApiKeySave} onClose={() => setShowApiKeyModal(false)} />}
         {showGenerateMore && <GenerateMoreModal currentCount={articles.length} apiKey={apiKey} onGenerate={handleGenerateMore} onClose={() => setShowGenerateMore(false)} />}
           {calendarSelectDay!==null && articles[calendarSelectDay] && (
-            <DayDetailModal article={articles[calendarSelectDay]} dayIndex={calendarSelectDay} startDate={startDate} releaseStatus={releaseStatus[calendarSelectDay]||{}} onToggleRelease={handleToggleRelease} onEdit={a=>{setCalendarSelectDay(null);setEditTarget(a);}} onClose={() => setCalendarSelectDay(null)} />
+            <DayDetailModal article={articles[calendarSelectDay]} dayIndex={calendarSelectDay} startDate={startDate} releaseStatus={releaseStatus[calendarSelectDay]||{}} onToggleRelease={handleToggleRelease} onEdit={a=>{setCalendarSelectDay(null);setEditTarget(a);}} onClose={() => setCalendarSelectDay(null)} onSkip={handleSkip} todayIndex={todayIndex} />
           )}
         </div>
       );
