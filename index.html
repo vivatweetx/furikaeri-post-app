@@ -298,12 +298,13 @@
     }
 
     // ===== ArticleCard =====
-    function ArticleCard({ article, dayIndex, isToday, startDate, releaseStatus, onToggleRelease, onEdit, onRegenerate }) {
+    function ArticleCard({ article, dayIndex, isToday, isPastUnreleased, startDate, releaseStatus, onToggleRelease, onEdit, onRegenerate, onSkip }) {
       const [activeTab, setActiveTab] = React.useState(0);
       const [copied, setCopied] = React.useState(false);
       const tabKey = TAB_KEYS[activeTab];
       const isTabReleased = releaseStatus?.[tabKey];
       const allReleased = TAB_KEYS.every(k => releaseStatus?.[k]);
+      const noneReleased = TAB_KEYS.every(k => !releaseStatus?.[k]);
       const releaseDate = startDate ? dateFromDayIndex(startDate, dayIndex) : null;
       const isSplitTab = SPLIT_TABS.includes(tabKey);
 
@@ -342,6 +343,7 @@
                 <p className="text-sm font-bold text-stone-800 leading-snug">{article.title}</p>
               </div>
               <div className="flex gap-1 shrink-0">
+                {(isToday || isPastUnreleased) && <button onClick={() => onSkip(dayIndex)} className="text-xs text-stone-400 hover:text-orange-500 border border-stone-200 hover:border-orange-300 rounded px-2 py-1 transition-colors">スキップ</button>}
                 <button onClick={() => onRegenerate(article)} className="text-xs text-stone-400 hover:text-red-500 border border-stone-200 hover:border-red-300 rounded px-2 py-1 transition-colors">再生成</button>
                 <button onClick={() => onEdit(article)} className="text-xs text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 rounded px-2 py-1 transition-colors">編集</button>
               </div>
@@ -867,6 +869,32 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
         setShowGenerateMore(false);
       };
 
+      // スキップ：dayIndexの記事を翌平日（dayIndex+1）に移動、以降も1日ずつ後ろにずれる
+      const handleSkip = (dayIndex) => {
+        if (!window.confirm("この記事をスキップして翌平日に移動しますか？\n以降の記事も1日ずつ後ろにずれます。")) return;
+        const next = [...articles];
+        // dayIndexの記事を取り出してdayIndex+1の位置に挿入
+        const [skipped] = next.splice(dayIndex, 1);
+        next.splice(dayIndex + 1, 0, skipped);
+        // releaseStatusも同様にずらす
+        const nextRelease = {};
+        Object.keys(releaseStatus).forEach(k => {
+          const idx = parseInt(k);
+          if (idx < dayIndex) {
+            nextRelease[idx] = releaseStatus[idx];
+          } else if (idx === dayIndex) {
+            // スキップした記事のリリース状態はdayIndex+1へ
+            nextRelease[dayIndex + 1] = releaseStatus[idx];
+          } else {
+            // dayIndex+1以降は1つ後ろへ（ただしdayIndex+1はすでに使われているのでdayIndex+2以降）
+            nextRelease[idx + 1] = releaseStatus[idx];
+          }
+        });
+        setArticles(next);
+        setReleaseStatus(nextRelease);
+        saveToFirebase(next, undefined, nextRelease);
+      };
+
       const filteredArticles = articles.filter((_,i) => {
         if (view==="today") return i===todayIndex;
         if (view==="upcoming") return todayIndex!==null && i>todayIndex;
@@ -949,7 +977,8 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
               <div className="space-y-4">
                 {filteredArticles.map(article => {
                   const dayIndex = articles.findIndex(a=>a.id===article.id);
-                  return <ArticleCard key={article.id} article={article} dayIndex={dayIndex} isToday={dayIndex===todayIndex} startDate={startDate} releaseStatus={releaseStatus[dayIndex]||{}} onToggleRelease={handleToggleRelease} onEdit={setEditTarget} onRegenerate={setRegenTarget} />;
+                  const isPastUnreleased = todayIndex !== null && dayIndex < todayIndex && TAB_KEYS.every(k => !(releaseStatus[dayIndex]||{})[k]);
+              return <ArticleCard key={article.id} article={article} dayIndex={dayIndex} isToday={dayIndex===todayIndex} isPastUnreleased={isPastUnreleased} startDate={startDate} releaseStatus={releaseStatus[dayIndex]||{}} onToggleRelease={handleToggleRelease} onEdit={setEditTarget} onRegenerate={setRegenTarget} onSkip={handleSkip} />;
                 })}
               </div>
             )}
