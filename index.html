@@ -977,7 +977,7 @@ ${customRequest ? `【追加要望】${customRequest}` : ""}
               <div className="space-y-4">
                 {filteredArticles.map(article => {
                   const dayIndex = articles.findIndex(a=>a.id===article.id);
-                  const isPastUnreleased = todayIndex !== null && dayIndex < todayIndex && TAB_KEYS.every(k => !(releaseStatus[dayIndex]||{})[k]);
+                  const isPastUnreleased = todayIndex !== null && dayIndex < todayIndex && TAB_KEYS.some(k => !(releaseStatus[dayIndex]||{})[k]);
               return <ArticleCard key={article.id} article={article} dayIndex={dayIndex} isToday={dayIndex===todayIndex} isPastUnreleased={isPastUnreleased} startDate={startDate} releaseStatus={releaseStatus[dayIndex]||{}} onToggleRelease={handleToggleRelease} onEdit={setEditTarget} onRegenerate={setRegenTarget} onSkip={handleSkip} />;
                 })}
               </div>
